@@ -5,6 +5,19 @@ import numpy as np
 # Load pre-trained Caffe model for face detection
 net = cv2.dnn.readNetFromCaffe("ssd/deploy.prototxt.txt", "ssd/res10_300x300_ssd_iter_140000.caffemodel")
 
+# def detect_faces_dnn(image):
+#     h, w = image.shape[:2]
+#     # Prepare image for DNN processing
+#     blob = cv2.dnn.blobFromImage(cv2.resize(image, (300, 300)), 1.0, (300, 300), (104.0, 177.0, 123.0))
+#     net.setInput(blob)
+#     detections = net.forward()
+#     faces = []
+#     for i in range(detections.shape[2]):
+#         confidence = detections[0, 0, i, 2]
+#         if confidence > 0.7:  
+#             box = detections[0, 0, i, 3:7] * [w, h, w, h]
+#             faces.append(box.astype("int"))
+#     return faces
 def detect_faces_dnn(image):
     h, w = image.shape[:2]
     # Prepare image for DNN processing
@@ -16,7 +29,20 @@ def detect_faces_dnn(image):
         confidence = detections[0, 0, i, 2]
         if confidence > 0.7:  
             box = detections[0, 0, i, 3:7] * [w, h, w, h]
-            faces.append(box.astype("int"))
+            x_start, y_start, x_end, y_end = box.astype("int")
+            
+            # Adjust bounding box to start below eyebrows
+            box_height = y_end - y_start
+            y_start += int(box_height * 0.2)  # Adjust top by 20% of height
+            
+            # Clamp values to image bounds
+            y_start = max(0, y_start)
+            y_end = min(h, y_end)
+            x_start = max(0, x_start)
+            x_end = min(w, x_end)
+            
+            # Save adjusted box
+            faces.append([x_start, y_start, x_end, y_end])
     return faces
 
 def labels_for_training_data(directory):
@@ -55,7 +81,18 @@ def train_classifier(faces, faceID):
 # Drawing a Rectangle on the Face Function
 def draw_rect(test_img, face):
     x_start, y_start, x_end, y_end = face
-    cv2.rectangle(test_img, (x_start, y_start), (x_end, y_end),(0, 255, 0), thickness=3)
+    
+    # # Adjust the top of the bounding box to start below the eyebrows
+    # box_height = y_end - y_start
+    # y_start += int(box_height * 0.2)  # Adjust the top by 20% of the height
+    
+    # # Ensure the adjusted box stays within the image bounds
+    # y_start = max(0, y_start)
+    
+    # # Draw the rectangle with the adjusted coordinates
+    cv2.rectangle(test_img, (x_start, y_start), (x_end, y_end), (0, 255, 0), thickness=3)
+
+
 
 # Putting text on images
 def put_text(confidence, img, name, x_start, y_start):
@@ -63,7 +100,7 @@ def put_text(confidence, img, name, x_start, y_start):
                 cv2.FONT_HERSHEY_PLAIN, 1, (0, 255, 0), 2)
 
 # Path to your dataset
-folder = "dataset_crop_test"
+folder = "augmented_dataset_crop_test"
 
 faces, faceID = labels_for_training_data(folder)
 face_recognizer = train_classifier(faces, faceID)
@@ -96,7 +133,9 @@ while True:
         print("No faces detected in the frame.")
     else:
         for face in faces_detected:
+
             x_start, y_start, x_end, y_end = face
+  
 
             # Ensure face region is not out of bounds
             if x_end > frame.shape[1] or y_end > frame.shape[0]:
