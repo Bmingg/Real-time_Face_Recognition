@@ -48,9 +48,17 @@ def labels_for_training_data(directory):
 
 # Train Classifier
 def train_classifier(faces, faceID):
-    face_recognizer = cv2.face.LBPHFaceRecognizer_create()
+    face_recognizer = cv2.face.LBPHFaceRecognizer_create(
+        radius=1,
+        neighbors=7,
+        grid_x=7,
+        grid_y=7)
     face_recognizer.train(faces, np.array(faceID))
     return face_recognizer
+
+def apply_clahe(image):
+    clahe = cv2.createCLAHE(clipLimit=1.5, tileGridSize=(8, 8))
+    return clahe.apply(image)
 
 # Drawing a Rectangle on the Face Function
 def draw_rect(test_img, face):
@@ -109,6 +117,8 @@ while True:
 
             roi_gray = cv2.resize(roi_gray, (231, 314))
             roi_gray = cv2.GaussianBlur(roi_gray, (5, 5), 0)
+
+            roi_gray = apply_clahe(roi_gray)
 
             label, confidence = face_recognizer.predict(roi_gray)
             print("Confidence:", confidence)

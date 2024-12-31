@@ -6,7 +6,8 @@ import subprocess
 
 # Folder where face data is stored
 datasets = 'datasets'
-
+python = "python"
+# python = "python3"
 # Global variable to track whether capturing/recognizing is ongoing
 capturing = False
 recognizing = False
@@ -34,7 +35,7 @@ def add_faces():
         return
 
     # Run the create_data script with the provided person's name
-    subprocess.run(["python3", "add_face_data.py", person_name])
+    subprocess.run([python, "add_face_data.py", person_name])
 
     # After capturing is done, re-enable buttons and clear status label
     add_faces_button.config(state=tk.NORMAL)
@@ -50,7 +51,7 @@ def recognize_face():
     status_label.config(text="Recognizing Faces..., Press ESC to close")
     root.update()  # Force UI update
 
-    subprocess.run(["python3", "face_recognize.py"])
+    subprocess.run([python, "face_recognize.py"])
 
     add_faces_button.config(state=tk.NORMAL)
     recognize_face_button.config(state=tk.NORMAL)
@@ -59,7 +60,7 @@ def recognize_face():
 
 # Function to list available faces
 def list_available_faces():    
-    available_faces = subprocess.run(["python3", "list_faces.py"], capture_output=True, text=True)
+    available_faces = subprocess.run([python, "list_faces.py"], capture_output=True, text=True)
     # Create a new window to display the available faces list
     result_window = tk.Toplevel(root)
     result_window.title("Available Face Data")
