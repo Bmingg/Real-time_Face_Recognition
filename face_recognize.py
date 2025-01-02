@@ -21,7 +21,7 @@ net = cv2.dnn.readNetFromCaffe("ssd/deploy.prototxt.txt", "ssd/res10_300x300_ssd
 def detect_faces_dnn(image):
     h, w = image.shape[:2]
     # Prepare image for DNN processing
-    blob = cv2.dnn.blobFromImage(cv2.resize(image, (300, 300)), 1.0, (300, 300), (104.0, 177.0, 123.0))
+    blob = cv2.dnn.blobFromImage(cv2.resize(image, (230, 238)), 1.0, (300, 300), (104.0, 177.0, 123.0))
     net.setInput(blob)
     detections = net.forward()
     faces = []
@@ -59,7 +59,7 @@ def labels_for_training_data(directory):
             print("img_path", img_path)
             print("id: ", id)
             img = cv2.imread(img_path)
-            img = cv2.resize(img, (231, 314))
+            img = cv2.resize(img, (230, 238))
             img = cv2.GaussianBlur(img, (5,5),0)
             if img is None:
                 print ("Not Loaded Properly")
@@ -100,7 +100,8 @@ def put_text(confidence, img, name, x_start, y_start):
                 cv2.FONT_HERSHEY_PLAIN, 1, (0, 255, 0), 2)
 
 # Path to your dataset
-folder = "augmented_dataset_crop_test"
+# folder = "augmented_dataset_crop_test"
+folder = "dataset_crop_test"
 
 faces, faceID = labels_for_training_data(folder)
 face_recognizer = train_classifier(faces, faceID)
@@ -110,7 +111,7 @@ face_recognizer.save('models/trained_on_test.yml')
 name = {0: "hiepnm", 1: "lamnt", 2: "minhvb"}  # Add more names if needed
 
 # Initialize webcam
-webcam = cv2.VideoCapture(0)
+webcam = cv2.VideoCapture(1)
 
 if not webcam.isOpened():
     print("Error: Could not access the camera.")
@@ -146,7 +147,7 @@ while True:
             if roi_gray is None or roi_gray.size == 0:  # Ensure ROI is not empty
                 continue  # Skip if the ROI is empty or None
 
-            roi_gray = cv2.resize(roi_gray, (231, 314))
+            roi_gray = cv2.resize(roi_gray, (250, 250))
             roi_gray = cv2.GaussianBlur(roi_gray, (5, 5), 0)
 
             label, confidence = face_recognizer.predict(roi_gray)
