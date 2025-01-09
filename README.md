@@ -9,6 +9,6 @@ Step 3: Data augmentation: TBD
 
 Step 4: Using LBPH to train and test on new images: lbph_test.ipynb
 
-Step 5: Real-time face recognition: TBD
+Step 5: Real-time face recognition: main.py
 
 Step 6: CLI wrap-up: TBD
