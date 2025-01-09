@@ -14,9 +14,27 @@ facemark.loadModel(LBF_MODEL_PATH)
 # Load pre-trained Caffe model for face detection
 net = cv2.dnn.readNetFromCaffe(CAFFE_MODEL_PROTOTXT, CAFFE_MODEL_WEIGHTS)
 
+# def detect_faces_dnn(image):
+#     h, w = image.shape[:2]
+#     # Prepare image for DNN processing
+#     blob = cv2.dnn.blobFromImage(cv2.resize(image, (300, 300)), 1.0, (300, 300), (104.0, 177.0, 123.0))
+#     net.setInput(blob)
+#     detections = net.forward()
+#     faces = []
+#     for i in range(detections.shape[2]):
+#         confidence = detections[0, 0, i, 2]
+#         if confidence > 0.7:
+#             box = detections[0, 0, i, 3:7] * [w, h, w, h]
+#             faces.append(box.astype("int"))
+#     return faces
+
+
 def detect_faces_dnn(image):
     h, w = image.shape[:2]
-    blob = cv2.dnn.blobFromImage(cv2.resize(image, (300, 300)), 1.0, (300, 300), (104.0, 177.0, 123.0))
+    # Prepare image for DNN processing
+    blob = cv2.dnn.blobFromImage(cv2.resize(
+        image, (230, 238)), 1.0, (300, 300), (104.0, 177.0, 123.0))
+    # blob = cv2.dnn.blobFromImage(cv2.resize(image, (300, 300)), 1.0, (300, 300), (104.0, 177.0, 123.0))
     net.setInput(blob)
     detections = net.forward()
     faces = []
@@ -26,16 +44,17 @@ def detect_faces_dnn(image):
         if confidence > 0.7:  # Confidence threshold
             box = detections[0, 0, i, 3:7] * [w, h, w, h]
             x_start, y_start, x_end, y_end = box.astype("int")
+
             if (x_end - x_start) > 30 and (y_end - y_start) > 30:  # Validate face size
                 faces.append((x_start, y_start, x_end, y_end))
 
     faces = non_max_suppression(faces)
     return faces
 
+
 def non_max_suppression(boxes, overlap_thresh=0.5):
     if len(boxes) == 0:
         return []
-
     boxes = np.array(boxes)
     x1 = boxes[:, 0]
     y1 = boxes[:, 1]
@@ -63,6 +82,33 @@ def non_max_suppression(boxes, overlap_thresh=0.5):
 
     return boxes[keep].tolist()
 
+
+def labels_for_training_data(directory):
+    faces = []
+    faceID = []
+    for path, subdirnames, filenames in os.walk(directory):
+        for filename in filenames:
+            if filename.startswith("."):
+                print("skipping system file")
+                continue
+            id = os.path.basename(path)
+            img_path = os.path.join(path, filename)
+            print("img_path", img_path)
+            print("id: ", id)
+            img = cv2.imread(img_path)
+            img = cv2.resize(img, (230, 238))
+            img = cv2.GaussianBlur(img, (5, 5), 0)
+            if img is None:
+                print("Not Loaded Properly")
+                continue
+            gray_img = cv2.cvtColor(img, cv2.COLOR_BGR2GRAY)
+            roi_gray = gray_img
+            faces.append(roi_gray)
+            faceID.append(int(id))
+
+    return faces, faceID
+
+
 def get_landmarks(image, face):
     x_start, y_start, x_end, y_end = face
     face_array = np.array([[x_start, y_start, x_end, y_end]], dtype=int)
@@ -70,13 +116,16 @@ def get_landmarks(image, face):
     return landmarks[0][0] if landmarks else None
 
 # Function to crop the face dynamically based on landmarks
+
+
 def crop_dynamic_face(image, landmarks):
     if landmarks is None:
         return None
 
     left_eyebrow = landmarks[17:22]
     right_eyebrow = landmarks[22:27]
-    min_y_eyebrows = min(np.min(left_eyebrow[:, 1]), np.min(right_eyebrow[:, 1]))
+    min_y_eyebrows = min(
+        np.min(left_eyebrow[:, 1]), np.min(right_eyebrow[:, 1]))
     eyebrow_offset = 5
     y_start = int(min_y_eyebrows + eyebrow_offset)
     x_min = int(np.min(landmarks[:, 0]))
@@ -85,29 +134,48 @@ def crop_dynamic_face(image, landmarks):
 
     return image[max(0, y_start):y_end, max(0, x_min):min(image.shape[1], x_max)]
 
+
 def apply_clahe(image):
     clahe = cv2.createCLAHE(clipLimit=1.5, tileGridSize=(8, 8))
     return clahe.apply(image)
 
+
 def train_classifier(faces, faceID):
-    face_recognizer = cv2.face.LBPHFaceRecognizer_create(radius=1, neighbors=7, grid_x=7, grid_y=7)
+    face_recognizer = cv2.face.LBPHFaceRecognizer_create(
+        radius=1, neighbors=7, grid_x=7, grid_y=7)
     face_recognizer.train(faces, np.array(faceID))
     return face_recognizer
 
+
 def draw_rect(frame, face):
     x_start, y_start, x_end, y_end = face
-    cv2.rectangle(frame, (x_start, y_start), (x_end, y_end), (0, 255, 0), thickness=2)
+    cv2.rectangle(frame, (x_start, y_start),
+                  (x_end, y_end), (0, 255, 0), thickness=2)
+
 
 def put_text(confidence, frame, name, x_start, y_start):
-    cv2.putText(frame, f'{name} - {confidence:.2f}', (x_start, y_start - 10), cv2.FONT_HERSHEY_SIMPLEX, 0.6, (0, 255, 0), 2)
+    cv2.putText(frame, f'{name} - {confidence:.2f}', (x_start,
+                y_start - 10), cv2.FONT_HERSHEY_SIMPLEX, 0.6, (0, 255, 0), 2)
 
-# Mapping labels to names
-name = {0: "hiepnm", 1: "lamnt", 2: "minhvb"}
+
+# Path to your dataset
+# folder = "augmented_dataset_crop_test"
+folder = "dataset_crop_test"
+
+faces, faceID = labels_for_training_data(folder)
+face_recognizer = train_classifier(faces, faceID)
+face_recognizer.save('models/trained_on_test.yml')
+
+# Name dictionary (change according to your training labels)
+name = {0: "hiepnm", 1: "lamnt", 2: "minhvb"}  # Add more names if needed
+
+# Initialize webcam
+webcam = cv2.VideoCapture(1)
 RECOGNITION_THRESHOLD = 60
 
 # Load trained model
-face_recognizer = cv2.face.LBPHFaceRecognizer_create()
-face_recognizer.read('models/trained_on_test.yml')
+# face_recognizer = cv2.face.LBPHFaceRecognizer_create()
+# face_recognizer.read('models/trained_on_test.yml')
 
 # Start webcam
 webcam = cv2.VideoCapture(1)
@@ -124,6 +192,9 @@ while True:
     faces_detected = detect_faces_dnn(frame)
     print("Faces Detected:", faces_detected)
 
+    if not faces_detected:  # If no faces are detected
+        print("No faces detected in the frame.")
+
     for face in faces_detected:
         landmarks = get_landmarks(gray_img, face)
         if landmarks is None:
@@ -134,9 +205,14 @@ while True:
             continue
 
         roi_gray = apply_clahe(cv2.GaussianBlur(roi_gray, (5, 5), 0))
+
+        roi_gray = cv2.resize(roi_gray, (230, 238))
+        roi_gray = cv2.GaussianBlur(roi_gray, (5, 5), 0)
+
         label, confidence = face_recognizer.predict(roi_gray)
 
-        predicted_name = name.get(label, "Unknown") if confidence < RECOGNITION_THRESHOLD else "Unrecognized"
+        predicted_name = name.get(
+            label, "Unknown") if confidence < RECOGNITION_THRESHOLD else "Unrecognized"
 
         draw_rect(frame, face)
         put_text(confidence, frame, predicted_name, face[0], face[1])
