@@ -98,6 +98,7 @@ def labels_for_training_data(directory):
             img = cv2.imread(img_path)
             img = cv2.resize(img, (230, 238))
             img = cv2.GaussianBlur(img, (5, 5), 0)
+
             if img is None:
                 print("Not Loaded Properly")
                 continue
@@ -132,7 +133,7 @@ def crop_dynamic_face(image, landmarks):
     x_max = int(np.max(landmarks[:, 0]))
     y_end = int(image.shape[0])
 
-    return image[max(0, y_start):y_end, max(0, x_min):min(image.shape[1], x_max)]
+    return image[max(0, y_start):y_end, max(0, x_min):min(image.shape[1], x_max)], x_min, y_start, x_max, y_end
 
 
 def apply_clahe(image):
@@ -159,8 +160,8 @@ def put_text(confidence, frame, name, x_start, y_start):
 
 
 # Path to your dataset
-# folder = "augmented_dataset_crop_test"
-folder = "dataset_crop_test"
+folder = "augmented_dataset_crop_test"
+# folder = "dataset_crop_test"
 
 faces, faceID = labels_for_training_data(folder)
 face_recognizer = train_classifier(faces, faceID)
@@ -194,28 +195,36 @@ while True:
 
     if not faces_detected:  # If no faces are detected
         print("No faces detected in the frame.")
+    else:
+        for face in faces_detected:
+            # Old method:
+            # x_start, y_start, x_end, y_end = face
+            # # Ensure face region is not out of bounds
+            # if x_end > frame.shape[1] or y_end > frame.shape[0]:
+            #     continue  # Skip if the face region exceeds the frame dimensions
+            # roi_gray = gray_img[y_start:y_end, x_start:x_end]
+            # if roi_gray is None or roi_gray.size == 0:  # Ensure ROI is not empty
+            #     continue  # Skip if the ROI is empty or None
+            # roi_gray = cv2.resize(roi_gray, (230, 238))
+            landmarks = get_landmarks(gray_img, face)
+            if landmarks is None:
+                continue
 
-    for face in faces_detected:
-        landmarks = get_landmarks(gray_img, face)
-        if landmarks is None:
-            continue
+            roi_gray, x_min, y_start, x_max, y_end = crop_dynamic_face(gray_img, landmarks)
+            if roi_gray is None or roi_gray.size == 0:
+                continue
 
-        roi_gray = crop_dynamic_face(gray_img, landmarks)
-        if roi_gray is None or roi_gray.size == 0:
-            continue
+            roi_gray = apply_clahe(cv2.GaussianBlur(roi_gray, (5, 5), 0))
 
-        roi_gray = apply_clahe(cv2.GaussianBlur(roi_gray, (5, 5), 0))
+            label, confidence = face_recognizer.predict(roi_gray)
 
-        roi_gray = cv2.resize(roi_gray, (230, 238))
-        roi_gray = cv2.GaussianBlur(roi_gray, (5, 5), 0)
+            predicted_name = name.get(
+                label, "Unknown") if confidence < RECOGNITION_THRESHOLD else "Unrecognized"
 
-        label, confidence = face_recognizer.predict(roi_gray)
-
-        predicted_name = name.get(
-            label, "Unknown") if confidence < RECOGNITION_THRESHOLD else "Unrecognized"
-
-        draw_rect(frame, face)
-        put_text(confidence, frame, predicted_name, face[0], face[1])
+            # new_face = (max(0, x_min), max(0, y_start), min(gray_img.shape[1], x_max), y_end)
+            # draw_rect(frame, new_face)
+            draw_rect(frame, face)
+            put_text(confidence, frame, predicted_name, face[0], face[1])
 
     cv2.imshow('Face Recognition', frame)
     if cv2.waitKey(10) == 27:
