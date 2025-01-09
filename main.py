@@ -3,9 +3,9 @@ import os
 import tkinter as tk
 from tkinter import simpledialog
 import subprocess
- 
+
 # Folder where face data is stored
-datasets = 'augmented_dataset_crop_test'
+datasets = 'datasets'
 python = "python"
 # python = "python3"
 # Global variable to track whether capturing/recognizing is ongoing
@@ -45,7 +45,7 @@ def add_faces():
 # Function to handle recognizing faces
 def recognize_face():
     # Disable buttons and update status label
-    add_faces_button.config(state=tk.DISABLED)
+    # add_faces_button.config(state=tk.DISABLED)
     recognize_face_button.config(state=tk.DISABLED)
     list_faces_button.config(state=tk.DISABLED)
     status_label.config(text="Recognizing Faces..., Press ESC to close")
