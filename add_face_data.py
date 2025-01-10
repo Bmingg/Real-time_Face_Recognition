@@ -13,7 +13,7 @@ def capture_images(person_name, datasets_folder='datasets'):
     existing_files = [f for f in os.listdir(person_path) if f.endswith('.jpg')]
     count = len(existing_files) + 1
 
-    cam = cv2.VideoCapture(1)  # Change the index if your primary webcam is not at index 0
+    cam = cv2.VideoCapture(0)  # Change the index if your primary webcam is not at index 0
     print("Press Enter to capture a photo, or ESC to quit.")
 
     while True:
