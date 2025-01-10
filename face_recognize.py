@@ -81,7 +81,7 @@ face_recognizer.save('models/trained_on_test.yml')
 name = {0: "hiepnm", 1: "lamnt", 2: "minhvb"}  # Add more names if needed
 
 # Initialize webcam
-webcam = cv2.VideoCapture(0)
+webcam = cv2.VideoCapture(1)
 
 if not webcam.isOpened():
     print("Error: Could not access the camera.")

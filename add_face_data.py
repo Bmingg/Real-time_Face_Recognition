@@ -4,14 +4,16 @@ import sys
 
 def capture_images(person_name, datasets_folder='datasets'):
     # Create or access the folder for the person
-    person_path = os.path.join(datasets_folder, person_name)
+    folders = [item for item in os.listdir(datasets_folder) if os.path.isdir(os.path.join(datasets_folder, item))]
+    id = str(len(folders))
+    person_path = os.path.join(datasets_folder, id)
     os.makedirs(person_path, exist_ok=True)
 
     # Determine the starting index for new images
     existing_files = [f for f in os.listdir(person_path) if f.endswith('.jpg')]
     count = len(existing_files) + 1
 
-    cam = cv2.VideoCapture(0)  # Change the index if your primary webcam is not at index 0
+    cam = cv2.VideoCapture(1)  # Change the index if your primary webcam is not at index 0
     print("Press Enter to capture a photo, or ESC to quit.")
 
     while True:
