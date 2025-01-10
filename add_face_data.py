@@ -17,8 +17,8 @@ def capture_images(person_name, datasets_folder='dataset_test', test_folder='tes
     os.makedirs(test_path, exist_ok=True)
     existing_fs = [f for f in os.listdir(test_path) if f.endswith('.jpg')]
     count_test = len(existing_fs) + 1
-
-    cam = cv2.VideoCapture(1)  # Change the index if your primary webcam is not at index 0
+    
+    cam = cv2.VideoCapture(0)  # Change the index if your primary webcam is not at index 0
     print("Press Enter to capture a photo, or ESC to quit.")
 
     while True:
