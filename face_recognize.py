@@ -48,7 +48,7 @@ def detect_faces_dnn(image):
             if (x_end - x_start) > 30 and (y_end - y_start) > 30:  # Validate face size
                 faces.append((x_start, y_start, x_end, y_end))
 
-    faces = non_max_suppression(faces)
+    # faces = non_max_suppression(faces)
     return faces
 
 
@@ -206,14 +206,16 @@ while True:
             # if roi_gray is None or roi_gray.size == 0:  # Ensure ROI is not empty
             #     continue  # Skip if the ROI is empty or None
             # roi_gray = cv2.resize(roi_gray, (230, 238))
+
             landmarks = get_landmarks(gray_img, face)
             x_start, y_start, x_end, y_end = face
-            if landmarks is None:
-                continue
+            # if landmarks is None:
+            #     continue
 
             y_start = crop_dynamic_face(gray_img, landmarks)
-            if x_end > frame.shape[1] or y_end > frame.shape[0]:
-                 continue  # Skip if the face region exceeds the frame dimensions
+            # if 
+            # y_start = y_start + (y_end - y_start) * 0.2
+
             roi_gray = gray_img[y_start:y_end, x_start:x_end]
             if roi_gray is None or roi_gray.size == 0:
                 continue
