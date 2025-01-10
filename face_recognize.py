@@ -1,14 +1,18 @@
 import cv2
 import os
 import numpy as np
+import face_alignment
+from skimage import io
+import torch
 
 # Load pre-trained Caffe model for face detection
 net = cv2.dnn.readNetFromCaffe("ssd/deploy.prototxt.txt", "ssd/res10_300x300_ssd_iter_140000.caffemodel")
+fa = face_alignment.FaceAlignment(face_alignment.LandmarksType.TWO_D, device='cuda' if torch.cuda.is_available() else 'cpu')
 
 def detect_faces_dnn(image):
     h, w = image.shape[:2]
     # Prepare image for DNN processing
-    blob = cv2.dnn.blobFromImage(cv2.resize(image, (300, 300)), 1.0, (300, 300), (104.0, 177.0, 123.0))
+    blob = cv2.dnn.blobFromImage(cv2.resize(image, (230, 238)), 1.0, (300, 300), (104.0, 177.0, 123.0))
     net.setInput(blob)
     detections = net.forward()
     faces = []
@@ -60,6 +64,17 @@ def apply_clahe(image):
     clahe = cv2.createCLAHE(clipLimit=1.5, tileGridSize=(8, 8))
     return clahe.apply(image)
 
+def get_landmark(gray_img, face):
+    face = np.array([face])
+    landmarks = fa.get_landmarks(gray_img, face)[0]
+    return landmarks
+
+def get_crop_img(landmarks):
+    left_eb = landmarks[17:22]
+    right_eb = landmarks[22:27]
+    y_start = int(min(np.min(left_eb[:, 1]), np.min(right_eb[:, 1])))
+    return y_start
+
 # Drawing a Rectangle on the Face Function
 def draw_rect(test_img, face):
     x_start, y_start, x_end, y_end = face
@@ -109,13 +124,18 @@ while True:
             # Ensure face region is not out of bounds
             if x_end > frame.shape[1] or y_end > frame.shape[0]:
                 continue  # Skip if the face region exceeds the frame dimensions
+            
+            
 
             roi_gray = gray_img[y_start:y_end, x_start:x_end]
-            
+            # landmarks = get_landmark(gray_img, face)
+            # y_start = get_crop_img(landmarks)
+            # roi_gray = gray_img[y_start:y_end, x_start:x_end]
+
             if roi_gray is None or roi_gray.size == 0:  # Ensure ROI is not empty
                 continue  # Skip if the ROI is empty or None
 
-            roi_gray = cv2.resize(roi_gray, (231, 314))
+            # roi_gray = cv2.resize(roi_gray, (231, 314))
             roi_gray = cv2.GaussianBlur(roi_gray, (5, 5), 0)
 
             roi_gray = apply_clahe(roi_gray)
