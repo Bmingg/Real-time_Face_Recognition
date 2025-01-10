@@ -127,14 +127,14 @@ def crop_dynamic_face(image, landmarks):
     right_eyebrow = landmarks[22:27]
     min_y_eyebrows = min(
         np.min(left_eyebrow[:, 1]), np.min(right_eyebrow[:, 1]))
-    eyebrow_offset = 5
-    y_start = int(min_y_eyebrows + eyebrow_offset)
-    x_min = int(np.min(landmarks[:, 0]))
-    x_max = int(np.max(landmarks[:, 0]))
-    y_end = int(image.shape[0])
+    eyebrow_offset = 10
+    y_start = int(min_y_eyebrows - eyebrow_offset)
+    # x_min = int(np.min(landmarks[:, 0]))
+    # x_max = int(np.max(landmarks[:, 0]))
+    # y_end = int(image.shape[0])
 
-    return image[max(0, y_start):y_end, max(0, x_min):min(image.shape[1], x_max)], x_min, y_start, x_max, y_end
-
+    # return image[max(0, y_start):y_end, max(0, x_min):min(image.shape[1], x_max)], x_min, y_start, x_max, y_end
+    return y_start
 
 def apply_clahe(image):
     clahe = cv2.createCLAHE(clipLimit=1.5, tileGridSize=(8, 8))
@@ -160,8 +160,8 @@ def put_text(confidence, frame, name, x_start, y_start):
 
 
 # Path to your dataset
-folder = "augmented_dataset_crop_test"
-# folder = "dataset_crop_test"
+# folder = "augmented_dataset_crop_test"
+folder = "dataset_crop_test"
 
 faces, faceID = labels_for_training_data(folder)
 face_recognizer = train_classifier(faces, faceID)
@@ -207,10 +207,14 @@ while True:
             #     continue  # Skip if the ROI is empty or None
             # roi_gray = cv2.resize(roi_gray, (230, 238))
             landmarks = get_landmarks(gray_img, face)
+            x_start, y_start, x_end, y_end = face
             if landmarks is None:
                 continue
 
-            roi_gray, x_min, y_start, x_max, y_end = crop_dynamic_face(gray_img, landmarks)
+            y_start = crop_dynamic_face(gray_img, landmarks)
+            if x_end > frame.shape[1] or y_end > frame.shape[0]:
+                 continue  # Skip if the face region exceeds the frame dimensions
+            roi_gray = gray_img[y_start:y_end, x_start:x_end]
             if roi_gray is None or roi_gray.size == 0:
                 continue
 
@@ -222,8 +226,8 @@ while True:
                 label, "Unknown") if confidence < RECOGNITION_THRESHOLD else "Unrecognized"
 
             # new_face = (max(0, x_min), max(0, y_start), min(gray_img.shape[1], x_max), y_end)
-            # draw_rect(frame, new_face)
-            draw_rect(frame, face)
+            # draw_rect(frame, face)
+            draw_rect(frame, (x_start, y_start, x_end, y_end))
             put_text(confidence, frame, predicted_name, face[0], face[1])
 
     cv2.imshow('Face Recognition', frame)
