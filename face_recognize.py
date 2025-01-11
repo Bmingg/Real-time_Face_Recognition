@@ -86,7 +86,7 @@ def put_text(confidence, img, name, x_start, y_start):
                 cv2.FONT_HERSHEY_PLAIN, 1, (0, 255, 0), 2)
 
 # Path to your dataset
-folder = "dataset_crop_test"
+folder = "new_augmented_dataset_crop_test"
 
 faces, faceID = labels_for_training_data(folder)
 face_recognizer = train_classifier(faces, faceID)
@@ -125,7 +125,10 @@ while True:
             if x_end > frame.shape[1] or y_end > frame.shape[0]:
                 continue  # Skip if the face region exceeds the frame dimensions
             
-            
+            off_set = 10
+
+            y_start = y_start + int((y_end-y_start)*0.269) - off_set
+
 
             roi_gray = gray_img[y_start:y_end, x_start:x_end]
             # landmarks = get_landmark(gray_img, face)
@@ -135,7 +138,7 @@ while True:
             if roi_gray is None or roi_gray.size == 0:  # Ensure ROI is not empty
                 continue  # Skip if the ROI is empty or None
 
-            # roi_gray = cv2.resize(roi_gray, (231, 314))
+            roi_gray = cv2.resize(roi_gray, (300, 300))
             roi_gray = cv2.GaussianBlur(roi_gray, (5, 5), 0)
 
             roi_gray = apply_clahe(roi_gray)
