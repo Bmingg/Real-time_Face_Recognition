@@ -86,17 +86,17 @@ def put_text(confidence, img, name, x_start, y_start):
                 cv2.FONT_HERSHEY_PLAIN, 1, (0, 255, 0), 2)
 
 # Path to your dataset
-folder = "dataset_crop_test"
+folder = "dataset_test"
 
 faces, faceID = labels_for_training_data(folder)
 face_recognizer = train_classifier(faces, faceID)
 face_recognizer.save('models/trained_on_test.yml')
 
 # Name dictionary (change according to your training labels)
-name = {0: "hiepnm", 1: "lamnt", 2: "minhvb"}  # Add more names if needed
+name = {0: "hiepnm", 1: "lamnt", 2: "minhvb", 3: "tungvd", 4: "thaohoang", 5: "vanhv", 6: "linhbm", 8: "kiendhc", 9: "datnd", 10: "thanhtq", 11: "phunt", 12: "anhndh", 13: "namdd", 14: "anhhtt", 15: "mahdt", 16: "giangns", 18: "hunglm", 19: "nhins", 20: "anhlq", 21: "chaulm"}  # Add more names if needed
 
 # Initialize webcam
-webcam = cv2.VideoCapture(1)
+webcam = cv2.VideoCapture(0)
 
 if not webcam.isOpened():
     print("Error: Could not access the camera.")

@@ -6,7 +6,7 @@ import subprocess
 
 # Folder where face data is stored
 datasets = 'datasets'
-# python = "python"
+# pytpython = "python"
 python = "python3"
 # Global variable to track whether capturing/recognizing is ongoing
 capturing = False
