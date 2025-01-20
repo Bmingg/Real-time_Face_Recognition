@@ -4,6 +4,8 @@ import numpy as np
 import face_alignment
 from skimage import io
 import torch
+from collections import Counter
+
 
 # Load pre-trained Caffe model for face detection
 net = cv2.dnn.readNetFromCaffe("ssd/deploy.prototxt.txt", "ssd/res10_300x300_ssd_iter_140000.caffemodel")
@@ -37,7 +39,7 @@ def labels_for_training_data(directory):
             print("img_path", img_path)
             print("id: ", id)
             img = cv2.imread(img_path)
-            img = cv2.resize(img, (231, 314))
+            img = cv2.resize(img, (230, 238))
             img = cv2.GaussianBlur(img, (5,5),0)
             if img is None:
                 print ("Not Loaded Properly")
@@ -45,7 +47,7 @@ def labels_for_training_data(directory):
 
             gray_img = cv2.cvtColor(img, cv2.COLOR_BGR2GRAY)
             roi_gray = gray_img
-            roi_gray = apply_clahe(gray_img)
+            # roi_gray = apply_clahe(gray_img)
             faces.append(roi_gray)
             faceID.append(int(id))
 
@@ -57,7 +59,8 @@ def train_classifier(faces, faceID):
         radius=1,
         neighbors=7,
         grid_x=7,
-        grid_y=7)
+        grid_y=7,
+        threshold=60)
     face_recognizer.train(faces, np.array(faceID))
     return face_recognizer
 
@@ -69,6 +72,14 @@ def train_classifier(faces, faceID):
 #         grid_y=8)
 #     face_recognizer.train(faces, np.array(faceID))
 #     return face_recognizer
+
+def get_dominant_label(collector, n=5):
+    list_of_conf_id_tuples = collector.getResults(sorted=True)
+    top_n = list_of_conf_id_tuples[:n]
+    labels = [label for label, _ in top_n]
+    label_counts = Counter(labels)
+    dominant_label = label_counts.most_common(1)[0][0]  # (label, count)
+    return dominant_label
 
 def apply_clahe(image):
     clahe = cv2.createCLAHE(clipLimit=1.5, tileGridSize=(8, 8))
@@ -114,7 +125,7 @@ if not webcam.isOpened():
     exit()
 
 # Define a confidence threshold for recognition
-RECOGNITION_THRESHOLD = 70
+RECOGNITION_THRESHOLD = 50
 
 while True:
     ret, frame = webcam.read()  # Capture frame
@@ -124,7 +135,7 @@ while True:
     gray_img = cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY)
 
     faces_detected = detect_faces_dnn(frame)
-    print("Faces Detected: ", faces_detected)
+    # print("Faces Detected: ", faces_detected)
 
     if not faces_detected:  # If no faces are detected
         print("No faces detected in the frame.")
@@ -152,11 +163,15 @@ while True:
             roi_gray = cv2.resize(roi_gray, (300, 300))
             roi_gray = cv2.GaussianBlur(roi_gray, (5, 5), 0)
 
-            roi_gray = apply_clahe(roi_gray)
-
-            label, confidence = face_recognizer.predict(roi_gray)
-            print("Confidence:", confidence)
-            print("Label:", label)
+            # roi_gray = apply_clahe(roi_gray)
+            collector = cv2.face.StandardCollector_create()
+            
+            face_recognizer.predict_collect(roi_gray, collector)
+            label = get_dominant_label(collector, 10)
+            confidence = collector.getMinDist()
+            # label, confidence = face_recognizer.predict(roi_gray)
+            # print("Confidence:", confidence)
+            # print("Label:", label)
 
             # Check if confidence is above the threshold for recognition
             if confidence < RECOGNITION_THRESHOLD:
