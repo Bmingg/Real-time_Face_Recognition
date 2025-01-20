@@ -141,7 +141,7 @@ while True:
             roi_gray = cv2.resize(roi_gray, (300, 300))
             roi_gray = cv2.GaussianBlur(roi_gray, (5, 5), 0)
 
-            roi_gray = apply_clahe(roi_gray)
+            # roi_gray = apply_clahe(roi_gray)
 
             label, confidence = face_recognizer.predict(roi_gray)
             print("Confidence:", confidence)
