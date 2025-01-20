@@ -45,6 +45,7 @@ def labels_for_training_data(directory):
 
             gray_img = cv2.cvtColor(img, cv2.COLOR_BGR2GRAY)
             roi_gray = gray_img
+            roi_gray = apply_clahe(gray_img)
             faces.append(roi_gray)
             faceID.append(int(id))
 
@@ -59,6 +60,15 @@ def train_classifier(faces, faceID):
         grid_y=7)
     face_recognizer.train(faces, np.array(faceID))
     return face_recognizer
+
+# def train_classifier(faces, faceID):
+#     face_recognizer = cv2.face.LBPHFaceRecognizer_create(
+#         radius=1,
+#         neighbors=8,
+#         grid_x=8,
+#         grid_y=8)
+#     face_recognizer.train(faces, np.array(faceID))
+#     return face_recognizer
 
 def apply_clahe(image):
     clahe = cv2.createCLAHE(clipLimit=1.5, tileGridSize=(8, 8))
@@ -88,6 +98,7 @@ def put_text(confidence, img, name, x_start, y_start):
 # Path to your dataset
 folder = "new_augmented_dataset_crop_test"
 
+
 faces, faceID = labels_for_training_data(folder)
 face_recognizer = train_classifier(faces, faceID)
 face_recognizer.save('models/trained_on_test.yml')
@@ -103,7 +114,7 @@ if not webcam.isOpened():
     exit()
 
 # Define a confidence threshold for recognition
-RECOGNITION_THRESHOLD = 60
+RECOGNITION_THRESHOLD = 70
 
 while True:
     ret, frame = webcam.read()  # Capture frame
@@ -141,7 +152,7 @@ while True:
             roi_gray = cv2.resize(roi_gray, (300, 300))
             roi_gray = cv2.GaussianBlur(roi_gray, (5, 5), 0)
 
-            # roi_gray = apply_clahe(roi_gray)
+            roi_gray = apply_clahe(roi_gray)
 
             label, confidence = face_recognizer.predict(roi_gray)
             print("Confidence:", confidence)
