@@ -93,8 +93,8 @@ face_recognizer = train_classifier(faces, faceID)
 face_recognizer.save('models/trained_on_test.yml')
 
 # Name dictionary (change according to your training labels)
-name = {0: "hiepnm", 1: "lamnt", 2: "minhvb", 3: "tungvd", 4: "thaohoang", 5: "vanhv", 6: "linhbm", 8: "kiendhc", 9: "datnd", 10: "thanhtq", 11: "phunt", 12: "anhndh", 13: "namdd", 14: "anhhtt", 15: "mahdt", 16: "giangns", 18: "hunglm", 19: "nhins", 20: "anhlq", 21: "chaulm"}  # Add more names if needed
-
+# name = {0: "hiepnm", 1: "lamnt", 2: "minhvb", 3: "tungvd", 4: "thaohoang", 5: "vanhv", 6: "linhbm", 7: "poe", 8: "kiendhc", 9: "datnd", 10: "thanhtq", 11: "phunt", 12: "anhndh", 13: "namdd", 14: "anhhtt", 15: "mahdt", 16: "giangns", 17: "loras", 18: "hunglm", 19: "nhins", 20: "anhlq", 21: "chaulm"}  # Add more names if needed
+name = {0: "hiepnm"}
 # Initialize webcam
 webcam = cv2.VideoCapture(0)
 
@@ -103,7 +103,7 @@ if not webcam.isOpened():
     exit()
 
 # Define a confidence threshold for recognition
-RECOGNITION_THRESHOLD = 60
+RECOGNITION_THRESHOLD = 50
 
 while True:
     ret, frame = webcam.read()  # Capture frame
