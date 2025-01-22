@@ -37,31 +37,56 @@ def augment_and_process(image_path, output_dir, folder, current_index):
         lighting_conditions = simulate_lighting_conditions(pil_image)
 
         transformations = {
-            # "Original": lambda x: x,
+            "Original": lambda x: x,
             # "Horizontal Flip": transforms.Compose([transforms.RandomHorizontalFlip(p=1.0)]),
-            "Rotation5": transforms.Compose([lambda x: F.rotate(x, -5)]),
+            # "Rotation5": transforms.Compose([lambda x: F.rotate(x, -5)]),
             "Rotation10": transforms.Compose([lambda x: F.rotate(x, -10)]),
             "Rotation15": transforms.Compose([lambda x: F.rotate(x, -15)]),
             "Rotation30": transforms.Compose([lambda x: F.rotate(x, -30)]),
             "Rotation45": transforms.Compose([lambda x: F.rotate(x, -45)]),
-            "RotationInv5": transforms.Compose([lambda x: F.rotate(x, 5)]),
+            # "RotationInv5": transforms.Compose([lambda x: F.rotate(x, 5)]),
             "RotationInv10": transforms.Compose([lambda x: F.rotate(x, 10)]),
             "RotationInv15": transforms.Compose([lambda x: F.rotate(x, 15)]),
             "RotationInv30": transforms.Compose([lambda x: F.rotate(x, 30)]),
             "RotationInv45": transforms.Compose([lambda x: F.rotate(x, 45)]),
             # "Rotation75": transforms.Compose([lambda x: F.rotate(x, 75)])
-            # "Crop": transforms.Compose([
-            #     transforms.RandomResizedCrop(size=(224, 224), scale=(0.8, 1.0))
-            # ])
+            "Crop": transforms.Compose([
+                transforms.RandomResizedCrop(size=(224, 224), scale=(0.8, 1.0))
+            ]),
+            # "Affine": transforms.Compose([transforms.RandomAffine(degrees=0, translate=(0.1, 0.1), shear=10)])
         }
 
         output_subfolder = os.path.join(output_dir, folder)
         os.makedirs(output_subfolder, exist_ok=True)
 
+        original_augmentations = {}
+        for name, transform in transformations.items():
+            augmented = transform(pil_image)
+            original_augmentations[name] = augmented
+            augmented_array = np.array(augmented)
+
+            height, width = augmented_array.shape[:2]
+            x_start, y_start = 0, 0
+            x_end, y_end = width, height
+
+            off_set = 10
+            eyebrow_y = int(y_end * 0.269) - off_set
+            roi_gray = augmented_array[eyebrow_y:y_end, x_start:x_end]
+
+            # Save the final image
+            save_path = os.path.join(
+                output_subfolder,
+                f"{os.path.splitext(os.path.basename(image_path))[0]}_Orig_{current_index}.jpg"
+            )
+            cv2.imwrite(save_path, cv2.cvtColor(roi_gray, cv2.COLOR_BGR2RGB))
+            print(f"Original transformation image saved: {save_path}")
+            current_index += 1
+
         for idx, (alpha, beta, lighting_image) in enumerate(lighting_conditions):
             lighting_pil_image = Image.fromarray(lighting_image)
             for name, transform in transformations.items():
                 augmented_image = transform(lighting_pil_image)
+
                 if isinstance(augmented_image, Image.Image):
                     augmented_image = np.array(augmented_image)
 
@@ -74,12 +99,14 @@ def augment_and_process(image_path, output_dir, folder, current_index):
                 eyebrow_y = int(y_end * 0.269) - off_set
                 roi_gray = augmented_image[eyebrow_y:y_end, x_start:x_end]
 
+                roi_rgb = cv2.cvtColor(roi_gray, cv2.COLOR_BGR2RGB)
+
                 # Save the final image
                 save_path = os.path.join(
                     output_subfolder,
                     f"{os.path.splitext(os.path.basename(image_path))[0]}_Aug_{current_index}.jpg"
                 )
-                cv2.imwrite(save_path, roi_gray)
+                cv2.imwrite(save_path, roi_rgb)
                 print(f"Image saved: {save_path}")
                 current_index += 1
 
@@ -89,24 +116,22 @@ def augment_and_process(image_path, output_dir, folder, current_index):
         print(f"Error: Could not open or read image file at {image_path}")
         return current_index
 
-# Main script
-
-input_dir = "/Users/tunglambg131003/Real-time_Face_Recognition/test_data"
-output_dir = "new_augmented_dataset_demo"
-target_folder = "0"  
-
-target_folder_path = os.path.join(input_dir, target_folder)
+aug_input_dir = "dataset_crop_test"
+aug_output_dir = "new_augmented_dataset_crop_test"
+aug_target_folder = "2"
+ 
+target_folder_path = os.path.join(aug_input_dir, aug_target_folder)
 if not os.path.exists(target_folder_path):
-    print(f"Target folder {target_folder} does not exist. Exiting.")
+                print(f"Target folder {aug_target_folder} does not exist. Exiting.")
 else:
-    current_index = 1
-    for filename in sorted(os.listdir(target_folder_path)):
-        image_path = os.path.join(target_folder_path, filename)
-        if os.path.isfile(image_path):
-            print(f"Processing image: {image_path}")
-            current_index = augment_and_process(
-                image_path=image_path,
-                output_dir=output_dir,
-                folder=target_folder,
-                current_index=current_index
+                current_index = 1
+                for filename in sorted(os.listdir(target_folder_path)):
+                    image_path = os.path.join(target_folder_path, filename)
+                    if os.path.isfile(image_path):
+                        print(f"Processing image: {image_path}")
+                        current_index = augment_and_process(
+                             image_path=image_path,
+                             output_dir= aug_output_dir,
+                             folder= aug_target_folder,
+                             current_index=current_index
             )
