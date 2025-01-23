@@ -1,7 +1,18 @@
 import os
+import json
+
+def load_names(file_path):
+    if not os.path.exists(file_path):
+        return {}
+    with open(file_path, 'r') as file:
+        return json.load(file)
+    
+LABELS_FILE = 'labels.json'
+
+name = load_names(LABELS_FILE)
 
 # Folder where face data is stored
-datasets = 'dataset_crop_test'
+datasets = 'new_augmented_dataset_crop_test'
 
 # Function to count the number of faces in a dataset
 def count_faces_in_dataset(dataset_path):
@@ -20,7 +31,7 @@ def list_faces():
         person_path = os.path.join(datasets, subdir)
         if os.path.isdir(person_path):  # Check if the path corresponds to a directory
             face_count = count_faces_in_dataset(person_path)
-            print(f"{subdir}: {face_count} faces")
+            print(f"{name.get(subdir)}: {face_count} faces")
 
 # Entry point of the script
 if __name__ == "__main__":
