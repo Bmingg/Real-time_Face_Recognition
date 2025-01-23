@@ -116,22 +116,22 @@ def augment_and_process(image_path, output_dir, folder, current_index):
         print(f"Error: Could not open or read image file at {image_path}")
         return current_index
 
-aug_input_dir = "dataset_crop_test"
-aug_output_dir = "new_augmented_dataset_crop_test"
-aug_target_folder = "2"
+# aug_input_dir = "dataset_crop_test"
+# aug_output_dir = "new_augmented_dataset_crop_test"
+# aug_target_folder = "2"
  
-target_folder_path = os.path.join(aug_input_dir, aug_target_folder)
-if not os.path.exists(target_folder_path):
-                print(f"Target folder {aug_target_folder} does not exist. Exiting.")
-else:
-                current_index = 1
-                for filename in sorted(os.listdir(target_folder_path)):
-                    image_path = os.path.join(target_folder_path, filename)
-                    if os.path.isfile(image_path):
-                        print(f"Processing image: {image_path}")
-                        current_index = augment_and_process(
-                             image_path=image_path,
-                             output_dir= aug_output_dir,
-                             folder= aug_target_folder,
-                             current_index=current_index
-            )
+# target_folder_path = os.path.join(aug_input_dir, aug_target_folder)
+# if not os.path.exists(target_folder_path):
+#                 print(f"Target folder {aug_target_folder} does not exist. Exiting.")
+# else:
+#                 current_index = 1
+#                 for filename in sorted(os.listdir(target_folder_path)):
+#                     image_path = os.path.join(target_folder_path, filename)
+#                     if os.path.isfile(image_path):
+#                         print(f"Processing image: {image_path}")
+#                         current_index = augment_and_process(
+#                              image_path=image_path,
+#                              output_dir= aug_output_dir,
+#                              folder= aug_target_folder,
+#                              current_index=current_index
+#             )
