@@ -4,6 +4,7 @@ import face_alignment
 from collections import Counter
 from labels import load_labels
 import torch
+from scipy.spatial.distance import euclidean, cityblock
 
 # Load pre-trained Caffe model for face detection
 net = cv2.dnn.readNetFromCaffe("ssd/deploy.prototxt.txt", "ssd/res10_300x300_ssd_iter_140000.caffemodel")
@@ -18,112 +19,97 @@ def detect_faces_dnn(image):
     faces = []
     for i in range(detections.shape[2]):
         confidence = detections[0, 0, i, 2]
-        if confidence > 0.7:  
+        if confidence > 0.7:
             box = detections[0, 0, i, 3:7] * [w, h, w, h]
             faces.append(box.astype("int"))
     return faces
 
-def get_dominant_label(collector, n, threshold):
-    list_of_conf_id_tuples = collector.getResults(sorted=True)
-    filtered_tuples = [(label, conf) for label, conf in list_of_conf_id_tuples if conf <= threshold]
-    if n >= len(filtered_tuples):
-        top_n = filtered_tuples
-    else:
-        top_n = filtered_tuples[:n]
-    labels = [label for label, _ in top_n]
-    label_counts = Counter(labels)
-    if not label_counts:
-        return None, 100
-    else:
-        dominant_label = label_counts.most_common(1)[0][0]  # (label, count)
-        dominant_label_confidences = [conf for label, conf in top_n if label == dominant_label]
-        # Calculate the average confidence for the dominant label
-        avg_confidence = sum(dominant_label_confidences) / len(dominant_label_confidences) if dominant_label_confidences else 0
-        return dominant_label, avg_confidence
+def compare_histograms(hist1, hist2):
+    hist1 = np.array(hist1).flatten()
+    hist2 = np.array(hist2).flatten()
 
-def put_text(confidence, img, name, x_start, y_start):
-    cv2.putText(img, f'{name} - Confidence: {confidence:.2f}', (x_start, y_start - 10), 
-                cv2.FONT_HERSHEY_PLAIN, 1, (0, 255, 0), 2)
+    # Check if histograms have the same size
+    if hist1.size != hist2.size:
+        raise ValueError(f"Histograms have different sizes: {hist1.size} and {hist2.size}")
+    
+    distances = {
+        "Manhattan": cityblock(hist1, hist2)
+    }
+
+    return distances
+
+def put_text(distances, img, name, x_start, y_start):
+    text = f'{name}:, Euc={distances["Manhattan"]:.2f} '
+    cv2.putText(img, text, (x_start, y_start - 10), cv2.FONT_HERSHEY_PLAIN, 1, (0, 255, 0), 2)
+
+# Load labels
+LABELS_FILE = 'labels.json'
+name = load_labels(LABELS_FILE)
 
 # Initialize webcam
-webcam = cv2.VideoCapture(1)
-
-if not webcam.isOpened():
-    print("Error: Could not access the camera.")
-    exit()
+cap = cv2.VideoCapture(1)
 
 face_recognizer = cv2.face.LBPHFaceRecognizer_create(radius=1, neighbors=7, grid_x=7, grid_y=7, threshold=70)
 face_recognizer.read('models/trained_on_test4.yml')
 
-LABELS_FILE = 'labels.json'
+face_recognizer2 = cv2.face.LBPHFaceRecognizer_create(radius=1, neighbors=7, grid_x=7, grid_y=7, threshold=70)
 
-name = load_labels(LABELS_FILE)
-
-RECOGNITION_THRESHOLD = 45
-
-REALTIME_RECOGNITION_THRESHOLD = 45
 while True:
-    ret, frame = webcam.read()  # Capture frame
-    if not ret:  # If the webcam stream ends
+    # Capture frame-by-frame
+    ret, frame = cap.read()
+
+    if not ret:
+        print("Error: Could not read frame.")
         break
 
     gray_img = cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY)
-
     faces_detected = detect_faces_dnn(frame)
-    # print("Faces Detected: ", faces_detected)
 
-    if not faces_detected:  # If no faces are detected
+    if not faces_detected:
         print("No faces detected in the frame.")
     else:
         for face in faces_detected:
             x_start, y_start, x_end, y_end = face
 
-            # Ensure face region is not out of bounds
             if x_end > frame.shape[1] or y_end > frame.shape[0]:
-                continue  # Skip if the face region exceeds the frame dimensions
-            
+                continue
+
             off_set = 15
-
-            y_start = y_start + int((y_end-y_start)*0.269) - off_set
-
+            y_start = y_start + int((y_end - y_start) * 0.269) - off_set
 
             roi_gray = gray_img[y_start:y_end, x_start:x_end]
-            # landmarks = get_landmark(gray_img, face)
-            # y_start = get_crop_img(landmarks)
-            # roi_gray = gray_img[y_start:y_end, x_start:x_end]
 
-            if roi_gray is None or roi_gray.size == 0:  # Ensure ROI is not empty
-                continue  # Skip if the ROI is empty or None
+            if roi_gray is None or roi_gray.size == 0:
+                continue
 
             roi_gray = cv2.resize(roi_gray, (300, 300))
             roi_gray = cv2.GaussianBlur(roi_gray, (5, 5), 0)
 
-            # roi_gray = apply_clahe(roi_gray)
-            collector = cv2.face.StandardCollector_create()
-            
-            face_recognizer.predict_collect(roi_gray, collector)
-            label, confidence = get_dominant_label(collector, 7, RECOGNITION_THRESHOLD)
-            # confidence = collector.getMinDist()
-            # label, confidence = face_recognizer.predict(roi_gray)
-            # print("Confidence:", confidence)
-            # print("Label:", label)
+            face_recognizer2.train(np.array([roi_gray]), np.array(3))
 
-            # Check if confidence is above the threshold for recognition
-            if confidence < REALTIME_RECOGNITION_THRESHOLD:
-                predicted_name = name.get(str(label), "Unknown")
-            else:
-                predicted_name = "Unrecognized"
+            hist_roi = face_recognizer2.getHistograms()[0][0]
+
+            distances = {}
+            for i in range(len(face_recognizer.getLabels())):
+                trained_hist = face_recognizer.getHistograms()[i]
+                distances[i] = compare_histograms(hist_roi, trained_hist)
+
+            best_id = min(distances, key=lambda id_: distances[id_]["Manhattan"])
+            predicted_name = name.get(str(face_recognizer.getLabels()[best_id][0]), "Unknown")
+           
 
             cv2.rectangle(frame, (x_start, y_start), (x_end, y_end), (0, 255, 0), 2)
-            put_text(confidence, frame, predicted_name, x_start, y_start)
+            put_text(distances[best_id], frame, predicted_name, x_start, y_start)
+            print(predicted_name)
+            print(distances[best_id])
 
-    # Show the frame with the recognized faces
+    # Display the resulting frame
     cv2.imshow('Face Recognition', frame)
 
-    # Exit if ESC is pressed
-    key = cv2.waitKey(10)
-    if key == 27:
+    # Exit on 'Esc' key press
+    if cv2.waitKey(1) & 0xFF == 27:  # 27 is the ASCII value for the 'Esc' key
         break
 
-webcam.release()
+# Release the capture object and close any OpenCV windows
+cap.release()
 cv2.destroyAllWindows()
