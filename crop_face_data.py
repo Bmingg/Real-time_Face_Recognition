@@ -64,3 +64,6 @@ def crop_and_save_faces(input_folder, output_folder, target_folder):
             face_output_path = os.path.join(output_target_folder_path, f"{os.path.splitext(image_name)[0]}_face{idx}.jpg")
             cv2.imwrite(face_output_path, face_crop)
             print(f"Saved cropped face: {face_output_path}")
+
+for i in range(32):
+  crop_and_save_faces("dataset_test", "/Users/tunglambg131003/Real-time_Face_Recognition/dataset_crop_test", str(i) )

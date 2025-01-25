@@ -5,7 +5,7 @@ from collections import Counter
 
 def load_trained_model(model_path='models/trained_on_test.yml'):
     if os.path.exists(model_path):
-        face_recognizer = cv2.face.LBPHFaceRecognizer_create(radius=1, neighbors=7, grid_x=7, grid_y=7, threshold=70)
+        face_recognizer = cv2.face.LBPHFaceRecognizer_create(radius=1, neighbors=7, grid_x=7, grid_y=7, threshold=45)
         face_recognizer.read(model_path)
         return face_recognizer
     return None
@@ -45,9 +45,9 @@ def train_classifier(faces, faceID):
     face_recognizer.train(faces, np.array(faceID))
     return face_recognizer
 
-# folder = "new_augmented_dataset_crop_test"
-# faces, faceID = labels_for_training_data(folder)
-# face_recognizer = cv2.face.LBPHFaceRecognizer_create(radius=1, neighbors=7, grid_x=7, grid_y=7, threshold=70)
-# face_recognizer = train_classifier(faces, faceID)
-# face_recognizer.save('models/trained_on_test4.yml')
+folder = "new_augmented_dataset_crop_test"
+faces, faceID = labels_for_training_data(folder)
+face_recognizer = cv2.face.LBPHFaceRecognizer_create(radius=1, neighbors=7, grid_x=7, grid_y=7, threshold=45)
+face_recognizer = train_classifier(faces, faceID)
+face_recognizer.save('models/model_test.yml')
 
