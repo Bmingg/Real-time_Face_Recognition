@@ -1,32 +1,20 @@
-import os
-import bz2
 import cv2
+import os
 import numpy as np
+import face_alignment
+from skimage import io
+import torch
+import bz2
+import time
+import json
 from sklearn.model_selection import train_test_split
-from sklearn.decomposition import PCA
-from sklearn.discriminant_analysis import LinearDiscriminantAnalysis as LDA
-from sklearn.svm import SVC
-from sklearn.metrics import accuracy_score, precision_score, confusion_matrix
-import tensorflow as tf
-from tensorflow.keras import layers, models
-import matplotlib.pyplot as plt
 
-# Define image size for resizing
-image_size = (100, 100)
+# Load pre-trained Caffe model for face detection
+net = cv2.dnn.readNetFromCaffe("ssd/deploy.prototxt.txt", "ssd/res10_300x300_ssd_iter_140000.caffemodel")
+fa = face_alignment.FaceAlignment(face_alignment.LandmarksType.TWO_D, device='cuda' if torch.cuda.is_available() else 'cpu')
 
-def load_feret_data(base_dir):
-    """
-    Load and preprocess the FERET dataset.
-    Traverses nested directories under `dvd1` and `dvd2`, extracts `.bz2` files, and processes `.ppm` images.
-
-    Args:
-        base_dir (str): Base directory containing `dvd1` and `dvd2`.
-
-    Returns:
-        images (np.ndarray): Flattened images.
-        labels (np.ndarray): Corresponding labels.
-        label_map (dict): Mapping of folder names to label indices.
-    """
+# Define FERET dataset loader
+def load_feret_data(base_dir, image_size=(231, 314)):
     images = []
     labels = []
     label_map = {}
@@ -35,10 +23,8 @@ def load_feret_data(base_dir):
     for dvd_folder in ['dvd1', 'dvd2']:
         dvd_path = os.path.join(base_dir, dvd_folder, 'data', 'images')
         if not os.path.exists(dvd_path):
-            print(f"Directory not found: {dvd_path}")
             continue
 
-        # Traverse subject directories (e.g., `00384`, `00153`)
         for subject_folder in os.listdir(dvd_path):
             subject_path = os.path.join(dvd_path, subject_folder)
             if not os.path.isdir(subject_path):
@@ -46,22 +32,15 @@ def load_feret_data(base_dir):
 
             for file in os.listdir(subject_path):
                 if file.endswith('.bz2'):
-                    compressed_file_path = os.path.join(subject_path, file)
-
-                    # Decompress the `.bz2` file
                     try:
+                        compressed_file_path = os.path.join(subject_path, file)
                         with bz2.BZ2File(compressed_file_path, 'rb') as f:
                             decompressed_data = f.read()
-
-                        # Decode `.ppm` image
                         img_array = np.frombuffer(decompressed_data, dtype=np.uint8)
                         img = cv2.imdecode(img_array, cv2.IMREAD_GRAYSCALE)
                         if img is not None:
-                            # Resize and flatten the image
                             img = cv2.resize(img, image_size)
-                            images.append(img.flatten())
-
-                            # Assign label based on folder name
+                            images.append(img)
                             if subject_folder not in label_map:
                                 label_map[subject_folder] = label_id
                                 label_id += 1
@@ -71,106 +50,105 @@ def load_feret_data(base_dir):
 
     return np.array(images), np.array(labels), label_map
 
-def evaluate_model(y_test, y_pred):
-    """
-    Evaluate model performance using precision, FAR, FRR, and other metrics.
+# Train LBPH face recognizer
+def train_classifier(faces, faceID):
+    face_recognizer = cv2.face.LBPHFaceRecognizer_create(
+        radius=1,
+        neighbors=7,
+        grid_x=7,
+        grid_y=7
+    )
+    face_recognizer.train(faces, np.array(faceID))
+    return face_recognizer
 
-    Args:
-        y_test (np.ndarray): Ground truth labels.
-        y_pred (np.ndarray): Predicted labels.
+# Apply CLAHE to an image
+def apply_clahe(image):
+    clahe = cv2.createCLAHE(clipLimit=1.5, tileGridSize=(8, 8))
+    return clahe.apply(image)
 
-    Returns:
-        dict: Dictionary containing various metrics.
-    """
-    precision = precision_score(y_test, y_pred, average='weighted')
+# Evaluate the recognizer on the test dataset
+def evaluate_feret_recognition(X_test, y_test, face_recognizer):
+    times = []
+    y_pred = []
 
-    cm = confusion_matrix(y_test, y_pred)
-    false_accepts = cm.sum(axis=0) - np.diag(cm)
-    false_rejects = cm.sum(axis=1) - np.diag(cm)
-    total = cm.sum()
+    for img, true_label in zip(X_test, y_test):
+        img = apply_clahe(img)
+        start = time.time()
 
-    far = false_accepts.sum() / total  # False Accept Rate
-    frr = false_rejects.sum() / total  # False Reject Rate
+        # Detect faces (mock detection as there's only one face per image here)
+        faces = detect_faces_dnn(img)
 
-    avg_error = (far + frr) / 2
-    fail_rate = (1 - accuracy_score(y_test, y_pred)) * 100
+        if len(faces) == 0:
+            y_pred.append(-1)  # Append invalid label
+            continue
 
-    return {
-        "Precision": precision,
-        "FAR": far,
-        "FRR": frr,
-        "Average Error": avg_error,
-        "Fail Rate (%)": fail_rate
+        x_start, y_start, x_end, y_end = faces[0]
+        roi_gray = img[y_start:y_end, x_start:x_end]
+
+        if roi_gray is None or roi_gray.size == 0:
+            y_pred.append(-1)
+            continue
+
+        label, confidence = face_recognizer.predict(roi_gray)
+        end = time.time()
+        times.append(end - start)
+
+        y_pred.append(label if confidence < 50 else -1)
+
+    avg_time = np.mean(times)
+    accuracy = np.sum(np.array(y_pred) == y_test) / len(y_test)
+
+    evaluation = {
+        "Average Recognition Time (sec)": avg_time,
+        "Accuracy": accuracy
     }
+    print("FERET Evaluation Results:", evaluation)
+    return evaluation
 
-def eigenfaces_model(X_train, X_test, y_train, y_test, n_components=100):
-    """Implements the Eigenfaces model using PCA."""
-    pca = PCA(n_components=n_components)
-    X_train_pca = pca.fit_transform(X_train)
-    X_test_pca = pca.transform(X_test)
+# Detect faces using DNN
+def detect_faces_dnn(image):
+    h, w = image.shape[:2]
 
-    classifier = SVC(kernel="linear", random_state=42)
-    classifier.fit(X_train_pca, y_train)
-    y_pred = classifier.predict(X_test_pca)
+    # Convert grayscale image to 3-channel BGR
+    if len(image.shape) == 2:  # Check if it's grayscale
+        image = cv2.cvtColor(image, cv2.COLOR_GRAY2BGR)
 
-    accuracy = accuracy_score(y_test, y_pred)
-    metrics = evaluate_model(y_test, y_pred)
-    metrics["Accuracy"] = accuracy
+    blob = cv2.dnn.blobFromImage(cv2.resize(image, (230, 238)), 1.0, (300, 300), (104.0, 177.0, 123.0))
+    net.setInput(blob)
+    detections = net.forward()
+    faces = []
+    for i in range(detections.shape[2]):
+        confidence = detections[0, 0, i, 2]
+        if confidence > 0.7:
+            box = detections[0, 0, i, 3:7] * [w, h, w, h]
+            faces.append(box.astype("int"))
+    return faces
 
-    return metrics, pca
 
-def fisherfaces_model(X_train, X_test, y_train, y_test):
-    """Implements the Fisherfaces model using LDA."""
-    lda = LDA()
-    X_train_lda = lda.fit_transform(X_train, y_train)
-    X_test_lda = lda.transform(X_test)
+# Main script
+if __name__ == "__main__":
+    base_dir = "/content/colorferet"  # Path to FERET dataset
+    image_size = (231, 314)
 
-    classifier = SVC(kernel="linear", random_state=42)
-    classifier.fit(X_train_lda, y_train)
-    y_pred = classifier.predict(X_test_lda)
+    # Load FERET dataset
+    images, labels, label_map = load_feret_data(base_dir, image_size)
+    print(f"Loaded {len(images)} images with {len(label_map)} unique labels.")
 
-    accuracy = accuracy_score(y_test, y_pred)
-    metrics = evaluate_model(y_test, y_pred)
-    metrics["Accuracy"] = accuracy
+    # Split the data into train and test sets
+    X_train, X_test, y_train, y_test = train_test_split(images, labels, test_size=0.2, random_state=42)
 
-    return metrics, lda
+    # Train the LBPH classifier
+    print("Training the LBPH face recognizer...")
+    face_recognizer = train_classifier(X_train, y_train)
 
-def cnn_model(X_train, X_test, y_train, y_test, input_shape):
-    """Implements a CNN-based facial recognition model."""
-    X_train_cnn = X_train.reshape(-1, *input_shape, 1)
-    X_test_cnn = X_test.reshape(-1, *input_shape, 1)
+    # Save the trained model
+    face_recognizer.save("models/trained_on_feret.yml")
+    print("Model saved as models/trained_on_feret.yml")
 
-    model = models.Sequential([
-        layers.Conv2D(32, (3, 3), activation='relu', input_shape=(*input_shape, 1)),
-        layers.MaxPooling2D((2, 2)),
-        layers.Conv2D(64, (3, 3), activation='relu'),
-        layers.MaxPooling2D((2, 2)),
-        layers.Flatten(),
-        layers.Dense(128, activation='relu'),
-        layers.Dense(len(np.unique(y_train)), activation='softmax')
-    ])
+    # Evaluate the model on the test set
+    evaluation_results = evaluate_feret_recognition(X_test, y_test, face_recognizer)
 
-    model.compile(optimizer='adam', loss='sparse_categorical_crossentropy', metrics=['accuracy'])
-
-    history = model.fit(X_train_cnn, y_train, epochs=10, validation_data=(X_test_cnn, y_test), batch_size=32, verbose=2)
-    y_pred = model.predict(X_test_cnn).argmax(axis=1)
-
-    accuracy = accuracy_score(y_test, y_pred)
-    metrics = evaluate_model(y_test, y_pred)
-    metrics["Accuracy"] = accuracy
-
-    return metrics, model, history
-
-# Path to the FERET dataset
-base_dir = "colorferet"
-
-# Load the dataset
-images, labels, label_map = load_feret_data(base_dir)
-print(f"Loaded {len(images)} images with {len(label_map)} unique labels.")
-
-# Split the data into train and test sets
-X_train, X_test, y_train, y_test = train_test_split(images, labels, test_size=0.2, random_state=42)
-
-# Eigenfaces model
-eigen_metrics, eigen_pca = eigenfaces_model(X_train, X_test, y_train, y_test)
-print("Eigenfaces Metrics:", eigen_metrics)
+    # Save the evaluation results
+    with open("feret_evaluation_results.json", "w") as f:
+        json.dump(evaluation_results, f, indent=4)
+    print("Evaluation results saved to feret_evaluation_results.json")
