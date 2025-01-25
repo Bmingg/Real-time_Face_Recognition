@@ -59,7 +59,7 @@ if not webcam.isOpened():
     exit()
 
 face_recognizer = cv2.face.LBPHFaceRecognizer_create(radius=1, neighbors=7, grid_x=7, grid_y=7, threshold=70)
-face_recognizer.read('models/trained_on_test4.yml')
+face_recognizer.read('models/trained_on_test.yml')
 
 LABELS_FILE = 'labels.json'
 
@@ -74,7 +74,9 @@ execution_times = {
     "Face Recognition": 0,
     "Total": 0
 }
-
+# Initialize FPS calculation
+frame_count = 0
+fps_start_time = time.time()
 while True:
     total_start = time.time()
     ret, frame = webcam.read()  # Capture frame
@@ -147,6 +149,14 @@ while True:
     total_end = time.time()
     measure_time("Total", total_start, total_end, execution_times)
     
+    # Update FPS calculation
+    frame_count += 1
+    fps_elapsed_time = time.time() - fps_start_time
+    fps = frame_count / fps_elapsed_time if fps_elapsed_time > 0 else 0
+
+    # Display FPS on the frame
+    cv2.putText(frame, f'FPS: {fps:.2f}', (10, 30), cv2.FONT_HERSHEY_SIMPLEX, 1, (0, 255, 0), 2)
+
     # Show the frame with the recognized faces
     cv2.imshow('Face Recognition', frame)
 
@@ -175,12 +185,18 @@ print(f"Time Difference (Total - Recognition): {time_difference:.4f} sec")
 print(f"Face Recognition: {recognition_percentage:.2f}% of total time")
 print(f"Other Processes: {other_percentage:.2f}% of total time")
 
+
+# Final FPS calculation
+fps_final = frame_count / (time.time() - fps_start_time)
+print(f"Final FPS: {fps_final:.2f}")
+
 # Save results to JSON
 results = {
     "Execution Times": execution_times,
     "Recognition Percentage": recognition_percentage,
     "Other Percentage": other_percentage,
-    "Time Difference": time_difference
+    "Time Difference": time_difference,
+    "FPS": fps_final
 }
 
 with open("execution_times_summary.json", "w") as f:
