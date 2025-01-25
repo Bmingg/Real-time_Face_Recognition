@@ -4,10 +4,16 @@ import face_alignment
 from collections import Counter
 from labels import load_labels
 import torch
-
+import time
+import json
 # Load pre-trained Caffe model for face detection
 net = cv2.dnn.readNetFromCaffe("ssd/deploy.prototxt.txt", "ssd/res10_300x300_ssd_iter_140000.caffemodel")
 fa = face_alignment.FaceAlignment(face_alignment.LandmarksType.TWO_D, device='cuda' if torch.cuda.is_available() else 'cpu')
+
+def measure_time(step_name, start, end, times):
+    elapsed_time = end - start
+    times[step_name] = times.get(step_name, 0) + elapsed_time
+    return elapsed_time
 
 def detect_faces_dnn(image):
     h, w = image.shape[:2]
@@ -46,7 +52,7 @@ def put_text(confidence, img, name, x_start, y_start):
                 cv2.FONT_HERSHEY_PLAIN, 1, (0, 255, 0), 2)
 
 # Initialize webcam
-webcam = cv2.VideoCapture(1)
+webcam = cv2.VideoCapture(0)
 
 if not webcam.isOpened():
     print("Error: Could not access the camera.")
@@ -62,12 +68,26 @@ name = load_labels(LABELS_FILE)
 RECOGNITION_THRESHOLD = 45
 
 REALTIME_RECOGNITION_THRESHOLD = 45
+
+execution_times = {
+    "Face Detection": 0,
+    "Face Recognition": 0,
+    "Total": 0
+}
+
 while True:
+    total_start = time.time()
     ret, frame = webcam.read()  # Capture frame
     if not ret:  # If the webcam stream ends
         break
 
     gray_img = cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY)
+
+    # time face detection
+    start_detection = time.time()
+    faces_detected = detect_faces_dnn(frame)
+    end_detection = time.time()
+    detection_time = measure_time("Face Detection", start_detection, end_detection, execution_times)
 
     faces_detected = detect_faces_dnn(frame)
     # print("Faces Detected: ", faces_detected)
@@ -108,6 +128,13 @@ while True:
             # print("Confidence:", confidence)
             # print("Label:", label)
 
+
+            # Time face recognition
+            start_recognition = time.time()
+            label, confidence = face_recognizer.predict(roi_gray)
+            end_recognition = time.time()
+            recognition_time = measure_time("Face Recognition", start_recognition, end_recognition, execution_times)
+
             # Check if confidence is above the threshold for recognition
             if confidence < REALTIME_RECOGNITION_THRESHOLD:
                 predicted_name = name.get(str(label), "Unknown")
@@ -116,7 +143,10 @@ while True:
 
             cv2.rectangle(frame, (x_start, y_start), (x_end, y_end), (0, 255, 0), 2)
             put_text(confidence, frame, predicted_name, x_start, y_start)
-
+    
+    total_end = time.time()
+    measure_time("Total", total_start, total_end, execution_times)
+    
     # Show the frame with the recognized faces
     cv2.imshow('Face Recognition', frame)
 
@@ -127,3 +157,31 @@ while True:
 
 webcam.release()
 cv2.destroyAllWindows()
+
+
+# Print execution times and calculate percentages
+print("Execution Times (in seconds):")
+for step, time_spent in execution_times.items():
+    print(f"{step}: {time_spent:.4f} sec")
+
+total_time = execution_times["Total"]
+recognition_percentage = (execution_times["Face Recognition"] / total_time) * 100
+other_percentage = 100 - recognition_percentage
+
+time_difference = total_time - execution_times["Face Recognition"]
+
+print("\nSummary:")
+print(f"Time Difference (Total - Recognition): {time_difference:.4f} sec")
+print(f"Face Recognition: {recognition_percentage:.2f}% of total time")
+print(f"Other Processes: {other_percentage:.2f}% of total time")
+
+# Save results to JSON
+results = {
+    "Execution Times": execution_times,
+    "Recognition Percentage": recognition_percentage,
+    "Other Percentage": other_percentage,
+    "Time Difference": time_difference
+}
+
+with open("execution_times_summary.json", "w") as f:
+    json.dump(results, f, indent=4)
