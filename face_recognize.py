@@ -6,10 +6,15 @@ from labels import load_labels
 import torch
 import time
 import json
+from evaluation import evaluate_model
 # Load pre-trained Caffe model for face detection
 net = cv2.dnn.readNetFromCaffe("ssd/deploy.prototxt.txt", "ssd/res10_300x300_ssd_iter_140000.caffemodel")
 fa = face_alignment.FaceAlignment(face_alignment.LandmarksType.TWO_D, device='cuda' if torch.cuda.is_available() else 'cpu')
 
+
+true_label = "hiepnm"
+true_count = 0
+total_count = 0
 def measure_time(step_name, start, end, times):
     elapsed_time = end - start
     times[step_name] = times.get(step_name, 0) + elapsed_time
@@ -143,6 +148,10 @@ while True:
             else:
                 predicted_name = "Unrecognized"
 
+            if predicted_name == true_label:
+                true_count += 1
+            total_count += 1
+
             cv2.rectangle(frame, (x_start, y_start), (x_end, y_end), (0, 255, 0), 2)
             put_text(confidence, frame, predicted_name, x_start, y_start)
     
@@ -181,7 +190,6 @@ other_percentage = 100 - recognition_percentage
 time_difference = total_time - execution_times["Face Recognition"]
 
 print("\nSummary:")
-print(f"Time Difference (Total - Recognition): {time_difference:.4f} sec")
 print(f"Face Recognition: {recognition_percentage:.2f}% of total time")
 print(f"Other Processes: {other_percentage:.2f}% of total time")
 
@@ -189,15 +197,19 @@ print(f"Other Processes: {other_percentage:.2f}% of total time")
 # Final FPS calculation
 fps_final = frame_count / (time.time() - fps_start_time)
 print(f"Final FPS: {fps_final:.2f}")
-
+recognition_percentage = f"{recognition_percentage:.2f}%"
 # Save results to JSON
-results = {
+time_result = {
     "Execution Times": execution_times,
     "Recognition Percentage": recognition_percentage,
-    "Other Percentage": other_percentage,
-    "Time Difference": time_difference,
     "FPS": fps_final
 }
 
-with open("execution_times_summary.json", "w") as f:
-    json.dump(results, f, indent=4)
+model_result = evaluate_model(true_count, total_count)
+
+
+with open("execution_model_summary.txt", "a") as f:
+    f.write(str(model_result) + "\n")
+
+with open("execution_times_summary.txt", "a") as f:
+    f.write(str(time_result) + "\n")
