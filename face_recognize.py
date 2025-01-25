@@ -12,13 +12,17 @@ net = cv2.dnn.readNetFromCaffe("ssd/deploy.prototxt.txt", "ssd/res10_300x300_ssd
 fa = face_alignment.FaceAlignment(face_alignment.LandmarksType.TWO_D, device='cuda' if torch.cuda.is_available() else 'cpu')
 
 # true_positive- The model predict that the person is Paul and the person was Paul (true Acceptance )
-# false_negative- The model predict that person is impostor and the person was Paul (false rejection)
-# C- The model predict that the person is Paul and the person was Impostor( false acceptance)
-# D- The model predict that the person is impostor and the person was impostor (true rejection)
+# false_negative- The model predict that person is unrecognized or other people and the person was Paul (false rejection)
+# false_positive- The model predict that the person is Paul or orther people and the person was unrecognized( false acceptance)
+# true_negative- The model predict that the person is unrecognized and the person was unrecognized (true rejection)
 
-true_label = "hiepnm"
+true_label1 = "hiepnm"
+true_label2 = "Unrecognized"
+current_label = "Unrecognized"
 false_negative_count = 0 
+false_positive_count = 0
 true_positive_count = 0
+true_negative_count = 0
 
 total_count = 0
 def measure_time(step_name, start, end, times):
@@ -85,6 +89,7 @@ execution_times = {
     "Face Recognition": 0,
     "Total": 0
 }
+
 # Initialize FPS calculation
 frame_count = 0
 fps_start_time = time.time()
@@ -155,10 +160,16 @@ while True:
             else:
                 predicted_name = "Unrecognized"
 
-            if predicted_name == true_label:
-                true_positive_count += 1
-            else:
-                false_negative_count += 1
+            if current_label == true_label1:
+                if predicted_name == true_label1:
+                    true_positive_count += 1
+                else:
+                    false_negative_count += 1
+            elif current_label == true_label2:
+                if predicted_name == true_label2:
+                    true_negative_count += 1
+                else:
+                    false_positive_count +=1
             total_count += 1
 
             cv2.rectangle(frame, (x_start, y_start), (x_end, y_end), (0, 255, 0), 2)
@@ -214,8 +225,12 @@ time_result = {
     "FPS": fps_final
 }
 
-model_result = evaluate_model(true_positive_count, false_negative_count, total_count)
-
+model_result = {
+    "True Positive": true_positive_count,
+    "False Positive": false_positive_count,
+    "False Negative": false_negative_count,
+    "True Negative": true_negative_count 
+}
 
 with open("execution_model_summary.txt", "a") as f:
     f.write(str(model_result) + "\n")
