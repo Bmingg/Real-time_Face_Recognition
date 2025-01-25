@@ -11,9 +11,15 @@ from evaluation import evaluate_model
 net = cv2.dnn.readNetFromCaffe("ssd/deploy.prototxt.txt", "ssd/res10_300x300_ssd_iter_140000.caffemodel")
 fa = face_alignment.FaceAlignment(face_alignment.LandmarksType.TWO_D, device='cuda' if torch.cuda.is_available() else 'cpu')
 
+# true_positive- The model predict that the person is Paul and the person was Paul (true Acceptance )
+# false_negative- The model predict that person is impostor and the person was Paul (false rejection)
+# C- The model predict that the person is Paul and the person was Impostor( false acceptance)
+# D- The model predict that the person is impostor and the person was impostor (true rejection)
 
 true_label = "hiepnm"
-true_count = 0
+false_negative_count = 0 
+true_positive_count = 0
+
 total_count = 0
 def measure_time(step_name, start, end, times):
     elapsed_time = end - start
@@ -101,6 +107,7 @@ while True:
 
     if not faces_detected:  # If no faces are detected
         print("No faces detected in the frame.")
+
     else:
         for face in faces_detected:
             x_start, y_start, x_end, y_end = face
@@ -149,7 +156,9 @@ while True:
                 predicted_name = "Unrecognized"
 
             if predicted_name == true_label:
-                true_count += 1
+                true_positive_count += 1
+            else:
+                false_negative_count += 1
             total_count += 1
 
             cv2.rectangle(frame, (x_start, y_start), (x_end, y_end), (0, 255, 0), 2)
@@ -205,7 +214,7 @@ time_result = {
     "FPS": fps_final
 }
 
-model_result = evaluate_model(true_count, total_count)
+model_result = evaluate_model(true_positive_count, false_negative_count, total_count)
 
 
 with open("execution_model_summary.txt", "a") as f:
